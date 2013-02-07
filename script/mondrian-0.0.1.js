@@ -636,8 +636,8 @@
                 return grids[selector];
             },
 
-            init: function () {
-                cssHandler.applyCss();
+            init: function (css) {
+                cssHandler.applyCss(css);
 
                 $.map(grids, function (theGrid) {
                     theGrid.applyRules();
