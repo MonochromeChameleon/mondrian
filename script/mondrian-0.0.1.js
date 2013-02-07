@@ -14,17 +14,7 @@
 
 (function ($) {
     "use strict";
-
-    var context,
-        debug,
-        utils,
-        models,
-        gridRules,
-        ruleHandler,
-        cssDefs = {},
-        namedGridTemplateAreas = {},
-        indexedGridTemplateAreas = [],
-        gridDisplays = ["grid", "inline-grid"];
+    var debug, models, context, gridRules, cssHandler;
 
     $.fn.extend({
         firstMatchingIndex: function (array, callback) {
@@ -39,12 +29,25 @@
         }
     });
 
+    $.extend({
+        throttledResize: function (delay, callback) {
+            var timeout;
+            window.onresize = function () {
+                if (timeout) {
+                    clearTimeout(timeout);
+                }
+                timeout = setTimeout(callback, delay);
+            };
+        }
+    });
+
     debug = (function () {
         // Uses query-string inspection either on the browser, or the css file path definition, to switch to debug
         // rendering.
 
-        var debugRegex = /mondrian-(debug|labels)/,
+        var debugRegex = /mondrian-(debug|labels|outline)/,
             labelsRegex = /mondrian-labels/,
+            outlineRegex = /mondrian-outline/,
             noDebugRegex = /mondrian-no-debug/,
 
             queryString = window.location.search;
@@ -52,6 +55,7 @@
         return {
             on: false,
             labels: false,
+            content: false,
             configure: function (cssFilePath) {
                 // Allow override in the browser of a debug-enabled css file path.
                 if ((window.location.search.match(noDebugRegex))) {
@@ -61,177 +65,77 @@
                 if (queryString.match(debugRegex) || cssFilePath.match(debugRegex)) {
                     this.on = true;
                     this.labels = queryString.match(labelsRegex) || cssFilePath.match(labelsRegex);
+                    this.content = queryString.match(outlineRegex) || cssFilePath.match(outlineRegex);
                 }
-            }
-        };
-    }());
-
-    utils = (function () {
-
-        return {
-            splitColumnRowDefinition: function (value) {
-                // Parse a grid-definition-rows / grid-definition-columns value into its component parts.
-
-                // Remove any excessive whitespace.
-                var parts = value.replace(/\s+/g, " ").split(/\s/),
-                    joinBrackets,
-                    name,
-                    ret,
-                    joined;
-
-                return $.map(parts, function (part) {
-                    // a part that is a string in quotes is a grid line name, not a width specification.
-                    if (part.match(/\"\w+\"/)) {
-                        name = part.match(/^\"(\w+)\"$/)[1];
-                        return undefined;
-                    }
-
-                    // We need to handle parenthesis in definitions (e.g. minmax(1fr, 50px)) by identifying when we are
-                    // opening / closing parenthesis.
-
-                    if (!joinBrackets && (!part.match(/\(/) || part.match(/\)/))) {
-                        // This means that our part is a complete width specification - either no parentheses, or else
-                        // an opening and closing parenthesis.
-                        // TODO: handle nested parentheses.
-                        ret = { name: name, size: part };
-                        name = undefined;
-                        return ret;
-                    }
-
-                    // If we are here then we need to aggregate parts up to the next closing parenthesis.
-                    if (!joinBrackets) {
-                        joinBrackets = "";
-                    }
-
-                    joinBrackets += " " + part;
-
-                    if (part.match(/\)/)) {
-                        // If our part includes a closing parenthesis then joinBrackets will now be a full width
-                        // definition
-                        joined = joinBrackets.trim();
-                        joinBrackets = undefined;
-
-                        ret = { name: name, size: joined };
-                        name = undefined;
-                        return ret;
-                    }
-
-                    return undefined;
-                });
             }
         };
     }());
 
     models = (function () {
+
+        function grid(selector) {
+            return {
+                rows: [],
+                columns: [],
+                applyRules: function () {
+                    cssHandler.applyRules(selector);
+                }
+            };
+        }
+
+        function rowCol(isRow) {
+            return function (definition) {
+                var type,
+                    heightOrWidth,
+                    ret,
+                    size = definition.size,
+                    name = definition.name;
+
+                if (size === "auto") {
+                    type = "auto";
+                } else if (size.match(/(\d+)px/)) {
+                    type = "px";
+                    heightOrWidth = size.match(/(\d+)px/)[1];
+                } else if (size.match(/(\d*\.?\d+)fr/)) {
+                    type = "fr";
+                    heightOrWidth = size.match(/(\d*\.?\d+)fr/)[1];
+                } else if (size.match(/(\d*\.?\d+)%/)) {
+                    type = "%";
+                    heightOrWidth = size.match(/(\d*\.?\d+)%/)[1];
+                }
+                heightOrWidth = Number(heightOrWidth);
+
+                ret = {
+                    type: type,
+                    value: heightOrWidth,
+                    name: name,
+                    definePercent: function (gridSize) {
+                        if (this.type === "%") {
+                            this[isRow ? "height" : "width"] = (this.value * gridSize / 100);
+                        }
+                    },
+
+                    defineFraction: function (frSizeUnit) {
+                        if (this.type === "fr") {
+                            this[isRow ? "height" : "width"] = (this.value * frSizeUnit);
+                        }
+                    }
+                };
+
+                ret[isRow ? "height" : "width"] = heightOrWidth;
+                return ret;
+            };
+        }
+
         return {
-            grid: function (selector) {
-                return {
-                    rows: [],
-                    columns: [],
-                    applyRules: function () {
-                        $(selector).children().each(function (ix, child) {
-                            $.each(cssDefs, function (selector) {
-                                if ($(child).is(selector)) {
-                                    ruleHandler.applyRules(selector, $(child));
-                                }
-                            });
-                        });
-                    }
-                };
-            },
-
-            row: function (definition) {
-
-                var type,
-                    height,
-                    size = definition.size,
-                    name = definition.name;
-
-                if (size === "auto") {
-                    type = "auto";
-                } else if (size.match(/(\d+)px/)) {
-                    type = "px";
-                    height = size.match(/(\d+)px/)[1];
-                } else if (size.match(/(\d*\.?\d+)fr/)) {
-                    type = "fr";
-                    height = size.match(/(\d*\.?\d+)fr/)[1];
-                } else if (size.match(/(\d*\.?\d+)%/)) {
-                    type = "%";
-                    height = size.match(/(\d*\.?\d+)%/)[1];
-                }
-                height = Number(height);
-
-                return {
-                    type: type,
-                    height: height,
-                    value: height,
-                    name: name,
-                    definePercent: function (gridHeight) {
-                        if (this.type === "%") {
-                            this.height = (this.value * gridHeight / 100);
-                        }
-                    },
-
-                    defineFraction: function (frHeightUnit) {
-                        if (this.type === "fr") {
-                            this.height = (this.value * frHeightUnit);
-                        }
-                    }
-                };
-            },
-
-            column: function (definition) {
-
-                var type,
-                    width,
-                    size = definition.size,
-                    name = definition.name;
-
-                if (size === "auto") {
-                    type = "auto";
-                } else if (size.match(/(\d+)px/)) {
-                    type = "px";
-                    width = size.match(/(\d+)px/)[1];
-                } else if (size.match(/(\d*\.?\d+)fr/)) {
-                    type = "fr";
-                    width = size.match(/(\d*\.?\d+)fr/)[1];
-                } else if (size.match(/(\d*\.?\d+)%/)) {
-                    type = "%";
-                    width = size.match(/(\d*\.?\d+)%/)[1];
-                }
-                width = Number(width);
-
-                return {
-                    type: type,
-                    width: width,
-                    value: width,
-                    name: name,
-                    definePercent: function (gridWidth) {
-                        if (this.type === "%") {
-                            this.width = (this.value * gridWidth / 100);
-                        }
-                    },
-
-                    defineFraction: function (frWidthUnit) {
-                        if (this.type === "fr") {
-                            this.width = (this.value * frWidthUnit);
-                        }
-                    }
-                };
-            },
-
+            grid: grid,
+            row: rowCol(true),
+            column: rowCol(false),
             gridComponent: function (object) {
                 return {
                     object: object,
-                    name: undefined,
-                    rowPosition: undefined,
-                    columnPosition: undefined,
                     rowSpan: 1,
                     columnSpan: 1,
-                    leftGridLineName: undefined,
-                    rightGridLineName: undefined,
-                    topGridLineName: undefined,
-                    bottomGridLineName: undefined,
                     spans: [],
                     spanAreaDefinitions: []
                 };
@@ -242,6 +146,8 @@
     context = (function () {
         var grids = {},
             gridParts = {},
+            namedGridTemplateAreas = {},
+            indexedGridTemplateAreas = [],
             gridRenderer = (function () {
 
                 function stripHash(selector) {
@@ -505,7 +411,7 @@
                         top += row.height || 0;
                     });
 
-                    if (debug.on) {
+                    if (debug.on && !debug.content) {
                         $.map(gridParts, function (definition) {
                             $(definition.object).remove();
                         });
@@ -592,31 +498,9 @@
 
                         constructGridAreas(rows, columns, selector);
 
-                        if (!debug.on) {
+                        if (!debug.on || debug.content) {
                             appendGridParts(selector);
                         }
-                    }
-                };
-            }()),
-
-            cssHandler = (function () {
-                return {
-                    applyCss: function (css) {
-                        $.map(css.cssRules, function (rule) {
-                            if (rule instanceof jscsspStyleRule) {
-                                cssDefs[rule.mSelectorText] = rule;
-                                var display;
-                                $.map(rule.declarations, function (declaration) {
-                                    if (declaration instanceof jscsspDeclaration &&
-                                            declaration.property === "display") {
-                                        display = declaration.valueText;
-                                    }
-                                });
-                                if (display) {
-                                    ruleHandler.applyRules(rule.mSelectorText, $(rule.mSelectorText));
-                                }
-                            }
-                        });
                     }
                 };
             }());
@@ -636,9 +520,31 @@
                 return grids[selector];
             },
 
-            init: function (css) {
-                cssHandler.applyCss(css);
+            getGridTemplateArea: function (name, row, col) {
+                var gta;
+                if (name) {
+                    gta = namedGridTemplateAreas[name];
+                }
+                if (!gta && isFinite(row) && isFinite(col) && indexedGridTemplateAreas[row]) {
+                    gta = indexedGridTemplateAreas[row][col];
+                }
+                return gta;
+            },
 
+            setGridTemplateArea: function (gta, name, row, col) {
+                if (!namedGridTemplateAreas[name]) {
+                    namedGridTemplateAreas[name] = gta;
+                }
+                if (!indexedGridTemplateAreas[row]) {
+                    indexedGridTemplateAreas[row] = [];
+                }
+                if (!indexedGridTemplateAreas[row][col]) {
+                    indexedGridTemplateAreas[row][col] = gta;
+                }
+                indexedGridTemplateAreas[row][col].name = name;
+            },
+
+            initializeGridRules: function () {
                 $.map(grids, function (theGrid) {
                     theGrid.applyRules();
                 });
@@ -653,14 +559,65 @@
     }());
 
     gridRules = (function () {
+
+        function splitColumnRowDefinition(value) {
+            // Parse a grid-definition-rows / grid-definition-columns value into its component parts.
+
+            // Remove any excessive whitespace.
+            var parts = value.replace(/\s+/g, " ").split(/\s/),
+                joinBrackets,
+                name,
+                ret,
+                joined;
+
+            return $.map(parts, function (part) {
+                // a part that is a string in quotes is a grid line name, not a width specification.
+                if (part.match(/\"\w+\"/)) {
+                    name = part.match(/^\"(\w+)\"$/)[1];
+                    return undefined;
+                }
+
+                // We need to handle parenthesis in definitions (e.g. minmax(1fr, 50px)) by identifying when we are
+                // opening / closing parenthesis.
+
+                if (!joinBrackets && (!part.match(/\(/) || part.match(/\)/))) {
+                    // This means that our part is a complete width specification - either no parentheses, or else
+                    // an opening and closing parenthesis.
+                    // TODO: handle nested parentheses.
+                    ret = { name: name, size: part };
+                    name = undefined;
+                    return ret;
+                }
+
+                // If we are here then we need to aggregate parts up to the next closing parenthesis.
+                if (!joinBrackets) {
+                    joinBrackets = "";
+                }
+
+                joinBrackets += " " + part;
+
+                if (part.match(/\)/)) {
+                    // If our part includes a closing parenthesis then joinBrackets will now be a full width
+                    // definition
+                    joined = joinBrackets.trim();
+                    joinBrackets = undefined;
+
+                    ret = { name: name, size: joined };
+                    name = undefined;
+                    return ret;
+                }
+
+                return undefined;
+            });
+        }
+
         return {
             gridArea: function (selector, object, value) {
                 var name = value.match(/^\"(\w+)\"$/)[1],
-                    gta,
+                    gta = context.getGridTemplateArea(name),
                     parts;
 
-                if (name && namedGridTemplateAreas[name]) {
-                    gta = namedGridTemplateAreas[name];
+                if (gta) {
                     this.gridRowPosition(selector, object, gta.rowPosition + 1);
                     this.gridColumnPosition(selector, object, gta.columnPosition + 1);
                     this.gridRowSpan(selector, object, gta.rowSpan);
@@ -727,7 +684,7 @@
             },
 
             gridDefinitionColumns: function (selector, object, value) {
-                var columnDefs = utils.splitColumnRowDefinition(value),
+                var columnDefs = splitColumnRowDefinition(value),
                     theGrid = context.getGrid(selector);
 
                 theGrid.columns = $.map(columnDefs, function (def) {
@@ -736,7 +693,7 @@
             },
 
             gridDefinitionRows: function (selector, object, value) {
-                var rowDefs = utils.splitColumnRowDefinition(value),
+                var rowDefs = splitColumnRowDefinition(value),
                     theGrid = context.getGrid(selector);
 
                 theGrid.rows = $.map(rowDefs, function (def) {
@@ -813,12 +770,11 @@
                 $.each(grid, function (ix, def) {
                     var row = parseInt(ix / columnCount, 10),
                         col = ix % columnCount,
-                        gta,
+                        gta = context.getGridTemplateArea(def, row, col),
                         rowSpan,
                         colSpan;
 
-                    if (!namedGridTemplateAreas[def] &&
-                            (!indexedGridTemplateAreas[row] || !indexedGridTemplateAreas[row][col])) {
+                    if (!gta) {
                         gta = models.gridComponent();
                         gta.name = def;
                         gta.rowPosition = row;
@@ -841,23 +797,19 @@
                             gta.spans = [[rowSpan, colSpan]];
                         }
 
-                        namedGridTemplateAreas[def] = gta;
-                        if (!indexedGridTemplateAreas[row]) {
-                            indexedGridTemplateAreas[row] = [];
-                        }
-
-                        indexedGridTemplateAreas[row][col] = gta;
-                    } else if (!namedGridTemplateAreas[def]) {
-                        indexedGridTemplateAreas[row][col].name = def;
-                        namedGridTemplateAreas[def] = indexedGridTemplateAreas[row][col];
+                        context.setGridTemplateArea(gta, def, row, col);
+                    } else if (!context.getGridTemplateArea(def)) {
+                        context.setGridTemplateArea(gta, def, row, col);
                     }
                 });
             }
         };
     }());
 
-    ruleHandler = (function () {
-        var usedCSSDefs = [];
+    cssHandler = (function () {
+
+        var usedCSSDefs = [],
+            cssDefs = {};
 
         function toCamelCase(hyphenated) {
             return hyphenated.replace(/-([a-z])/gi, function (s, group) {
@@ -867,7 +819,7 @@
 
         function isW3CGrid(rule) {
             if (rule.property === "display") {
-                return $.inArray(rule.valueText, gridDisplays) >= 0;
+                return rule.valueText.match(/grid$/);
             }
             return gridRules.hasOwnProperty(toCamelCase(rule.property));
         }
@@ -889,21 +841,53 @@
             }
         }
 
-        return {
-            applyRules: function (selector, object) {
+        function initializeCssRules(css) {
+            $.map(css.cssRules, function (rule) {
+                if (rule instanceof jscsspStyleRule) {
+                    cssDefs[rule.mSelectorText] = rule;
+                    var display;
+                    $.map(rule.declarations, function (declaration) {
+                        if (declaration instanceof jscsspDeclaration &&
+                                declaration.property === "display") {
+                            display = declaration.valueText;
+                        }
+                    });
+                    if (display) {
+                        cssHandler.applyRules(rule.mSelectorText, $(rule.mSelectorText));
+                    }
+                }
+            });
+        }
+
+        function applyRules(selector, object) {
+            if (object) {
                 var rules = cssDefs[selector].declarations;
+
                 $.map(rules, function (rule) {
                     if (rule instanceof jscsspDeclaration) {
                         applyRule(selector, object, rule);
                     }
                 });
-                usedCSSDefs.push(selector);
-            },
 
+                usedCSSDefs.push(selector);
+            } else {
+                $(selector).children().each(function (ix, child) {
+                    $.each(cssDefs, function (def) {
+                        if ($(child).is(def)) {
+                            cssHandler.applyRules(def, $(child));
+                        }
+                    });
+                });
+            }
+        }
+
+        return {
+            initializeCssRules: initializeCssRules,
+            applyRules: applyRules,
             applyUnusedRules: function () {
                 $.each(cssDefs, function (selector) {
                     if ($.inArray(selector, usedCSSDefs) < 0) {
-                        ruleHandler.applyRules(selector, $(selector));
+                        applyRules(selector, $(selector));
                     }
                 });
             }
@@ -912,20 +896,12 @@
 
     $.extend({
         mondrian: function (css) {
+            cssHandler.initializeCssRules(css);
+            context.initializeGridRules();
 
-            var timeout;
+            cssHandler.applyUnusedRules();
 
-            function delayedRenderAll() {
-                if (timeout) {
-                    clearTimeout(timeout);
-                }
-                timeout = setTimeout(context.renderAll, 10);
-            }
-
-            context.init(css);
-            ruleHandler.applyUnusedRules();
-
-            window.onresize = delayedRenderAll;
+            $.throttledResize(10, context.renderAll);
             context.renderAll();
         }
     });
@@ -949,7 +925,7 @@
             // Get and parse the css file
             $.get(cssFile, function (data) {
                 var parser = new CSSParser(),
-                    sheet = parser.parse(data, false, true);
+                    sheet = parser.parse(data);
 
                 // Apply the file to our page
                 $.mondrian(sheet);
