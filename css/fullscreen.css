@@ -1,0 +1,13 @@
+#grid {
+    display: grid;
+    grid-template: "header header header"
+    			   "sidebar body right"
+    			   "sidebar footer footer";
+    			   
+    grid-definition-columns: 250px 1fr 180px;
+    grid-definition-rows: 120px 1fr 80px;
+
+    width: 100%;
+    height: 100%;
+    position: absolute;
+}

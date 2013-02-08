@@ -1,0 +1,114 @@
+#grid {
+    display: grid;
+    
+    grid-template: "title board"
+    			   "stats board"
+    			   "score controls";
+
+    grid-definition-columns: 300px 1fr;
+    grid-definition-rows: 150px 1fr 150px;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+}
+
+#title {
+	grid-area: "title";
+	padding: 10px;	
+}
+
+#board {
+	grid-area: "board";
+	background-color: black;
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background-image: url('images/chameleon.jpg');
+	background-position: right bottom;
+	background-repeat: no-repeat;
+	background-size: 50%;
+	color: white;
+	padding: 50px;
+	font-size: 2em;
+	line-height: 2em;
+}
+
+#stats {
+	grid-area: "stats";
+}
+
+dl {
+	margin: 10px;
+	border: 3px solid gray;
+	border-radius: 5px;
+}
+
+dl dt, dl dd {
+	margin: 4px;
+	display: inline-block;
+}
+
+dl dt {
+	width: 120px;
+}
+
+#score {
+	grid-area: "score";
+	padding: 10px;
+	border-top: 5px solid purple;
+}
+
+#controls {
+	padding: 10px;
+	grid-area: "controls";
+	border-top: 5px solid purple;
+	border-left: 5px solid purple;
+	position: absolute;
+	width: 100%;
+	height: 100%;
+/*	display: grid;	
+	grid-definition-columns: 50px 50px 50px 1fr 150px;
+	grid-definition-rows: 50px 50px 50px; */
+}
+
+/*#up {
+	grid-column-position: 2;
+	grid-row-position: 1;
+}
+
+#down {
+	grid-column-position: 2;
+	grid-row-position: 3;
+}
+
+#left {
+	grid-column-position: 1;
+	grid-row-position: 2;
+}
+
+#right {
+	grid-column-position: 3;
+	grid-row-position: 2;
+}
+
+#buttons {
+	grid-column-position: 5;
+	grid-row-position: 1;
+	grid-row-span: 3;
+	display: grid;
+	grid-template: "no b"
+	               "a yes";
+	grid-definition-rows: 1fr 1fr;
+	grid-definition-columns: 1fr 1fr;
+}
+
+#a {
+	grid-area: "a";
+}
+
+#b {
+	grid-area: "b";
+}*/
+

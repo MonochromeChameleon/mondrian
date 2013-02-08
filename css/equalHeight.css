@@ -1,0 +1,54 @@
+#grid {
+    display: grid;
+    grid-template: "header header"
+    			   "sidebar body"
+    			   "footer footer";
+    			   
+    grid-definition-columns: 250px 1fr;
+    grid-definition-rows: 120px 1fr 80px;
+
+    width: 960px;
+    height: 850px;
+    margin: 10px auto;
+    position: relative;
+}
+
+#header {
+	grid-area: "header";
+	padding: 0 10px;
+	height: 100%;
+}
+
+#header h1 {
+	margin: 0;
+}
+
+#header p {
+	float: right;
+	margin-top: 70px;
+}
+
+#sidebar {
+	grid-area: "sidebar";
+	background-color: black;
+	color: white;
+	position: absolute;
+	height: 100%;
+	width: 100%;
+	border-top: 3px solid black;
+	border-bottom: 3px solid black;
+}
+
+#body {
+	grid-area: "body";
+	margin: 0 10px;
+	border-bottom: 3px solid gray;
+	border-top: 3px solid gray;
+	height: 100%;
+}
+
+#footer {
+	grid-area: "footer";
+	text-align: center;
+	margin-right: 10px;
+}
