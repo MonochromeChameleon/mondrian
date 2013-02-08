@@ -3,18 +3,18 @@
     width: 100%;
     height: 100%;
     position: absolute;
+grid-template: "a a   a hello matthew"
+    "a a a no no"
+    "b c c hdujhfgdhshh kjhkjh";
 
-    grid-template: "QQ";
+    grid-definition-columns: 1fr      50px 10% 2fr 20px;
 
-    grid-definition-columns: 1fr;
-
-    grid-definition-rows: 1fr;
+    grid-definition-rows: 2fr 1fr 1fr;
 }
 
 #temp {
-	grid-area: "QQ";
+	grid-area: "hdujhfgdhshh";
 }
-
 h1 {
 	padding: 50px;
 }
