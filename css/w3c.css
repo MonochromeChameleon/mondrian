@@ -1,6 +1,6 @@
 #grid {
     display: grid;
-    
+
     grid-template: "title board"
     			   "stats board"
     			   "score controls";
@@ -14,7 +14,7 @@
 
 #title {
 	grid-area: "title";
-	padding: 10px;	
+	padding: 10px;
 }
 
 #board {
@@ -68,12 +68,16 @@ dl dt {
 	position: absolute;
 	width: 100%;
 	height: 100%;
-/*	display: grid;	
+	display: grid;
 	grid-definition-columns: 50px 50px 50px 1fr 150px;
-	grid-definition-rows: 50px 50px 50px; */
+	grid-definition-rows: 50px 50px 50px;
 }
 
-/*#up {
+#controls > div {
+    padding: 20px;
+}
+
+#up {
 	grid-column-position: 2;
 	grid-row-position: 1;
 }
@@ -97,11 +101,19 @@ dl dt {
 	grid-column-position: 5;
 	grid-row-position: 1;
 	grid-row-span: 3;
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	padding: 0;
 	display: grid;
 	grid-template: "no b"
 	               "a yes";
 	grid-definition-rows: 1fr 1fr;
 	grid-definition-columns: 1fr 1fr;
+}
+
+#buttons > div {
+    padding: 30px;
 }
 
 #a {
@@ -110,5 +122,5 @@ dl dt {
 
 #b {
 	grid-area: "b";
-}*/
+}
 
